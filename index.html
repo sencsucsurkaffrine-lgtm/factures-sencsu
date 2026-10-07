@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<!-- ══════════════════════════════════════════════════════════════════════════
+  FACTURES SEN-CSU — PWA (Progressive Web App) pour les ICP
+  Hebergee sur GitHub Pages. Fonctionne 100% hors ligne apres installation.
+  Appelle la Web App Apps Script existante pour lire/ecrire dans le Sheet.
+═══════════════════════════════════════════════════════════════════════════ -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1a7a4a">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Factures SEN-CSU</title>
+<style>
+  :root {
+    --green:#1a7a4a; --green-dark:#14603a; --green-light:#e8f5ee;
+    --grey:#f0f2f5; --text:#1a1a1a; --text2:#667; --danger:#c0392b; --orange:#e67e22;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  body { background:var(--grey); color:var(--text); min-height:100vh; }
+  .topbar { background:var(--green); color:#fff; padding:12px 16px; display:flex;
+    align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+  .topbar h1 { font-size:16px; font-weight:600; }
+  .topbar .sub { font-size:11px; opacity:.85; }
+  .badge-sync { background:var(--orange); color:#fff; border-radius:12px; font-size:11px;
+    padding:3px 10px; font-weight:700; }
+  .badge-ok { background:rgba(255,255,255,.25); }
+  .screen { display:none; padding:16px; max-width:640px; margin:0 auto; }
+  .screen.active { display:block; }
+  .login-card { background:#fff; border-radius:12px; padding:28px 22px; margin-top:8vh;
+    box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  .login-card .logo { text-align:center; margin-bottom:8px; }
+  .login-card h2 { text-align:center; font-size:17px; margin:8px 0 4px; color:var(--green); }
+  .login-card p { text-align:center; font-size:12px; color:var(--text2); margin-bottom:20px; }
+  label { display:block; font-size:12px; font-weight:600; margin:12px 0 4px; color:#333; }
+  input,select { width:100%; padding:12px; border:1px solid #ccc; border-radius:8px;
+    font-size:15px; background:#fff; box-sizing:border-box; }
+  input[type="date"],input[type="datetime-local"],input[type="number"]{
+    -webkit-appearance:none; appearance:none; height:46px; line-height:normal;
+    min-height:46px; box-sizing:border-box; }
+  input:focus,select:focus { outline:2px solid var(--green); border-color:var(--green); }
+  .btn { width:100%; padding:14px; border:0; border-radius:8px; background:var(--green);
+    color:#fff; font-size:15px; font-weight:700; cursor:pointer; margin-top:18px; }
+  .btn:active { background:var(--green-dark); }
+  .btn.secondary { background:#fff; color:var(--green); border:1.5px solid var(--green); }
+  .btn.small { width:auto; padding:8px 16px; font-size:13px; margin-top:0; }
+  .err { color:var(--danger); font-size:13px; margin-top:10px; text-align:center; min-height:18px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+  .card { background:#fff; border-radius:12px; padding:16px 12px; text-align:center;
+    box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; border-top:4px solid var(--green); }
+  .card:active { transform:scale(.97); }
+  .card .ic { font-size:30px; }
+  .card .t { font-size:12px; font-weight:700; margin-top:6px; line-height:1.3; }
+  .syncbar { background:#fff; border-radius:10px; padding:12px 14px; margin-top:4px;
+    display:flex; align-items:center; justify-content:space-between; box-shadow:0 1px 4px rgba(0,0,0,.06); font-size:13px; }
+  .syncbar.pending { border-left:4px solid var(--orange); }
+  .syncbar.done { border-left:4px solid var(--green); }
+  .form-head { display:flex; align-items:center; gap:10px; margin-top:14px; margin-bottom:12px; }
+  .back { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; background:var(--green); border:0; border-radius:12px; font-size:24px; line-height:1; cursor:pointer; color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.15); flex:0 0 auto; }
+  .back:active { opacity:.85; }
+  .form-title { font-size:15px; font-weight:700; }
+  .req::after { content:" *"; color:var(--danger); }
+  .form-box { background:#fff; border-radius:12px; padding:18px 16px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#222;
+    color:#fff; padding:12px 22px; border-radius:24px; font-size:13px; display:none; z-index:99; max-width:90%; }
+  .offline-banner { background:var(--orange); color:#fff; text-align:center; font-size:12px; padding:6px; display:none; }
+  .install-banner { background:var(--green-light); border:1px solid var(--green); border-radius:10px;
+    padding:12px; margin-top:12px; font-size:13px; display:none; }
+  .install-banner button { margin-top:8px; }
+.list-card{background:#fff;border:1px solid #e3ece7;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700}
+#loader{position:fixed;inset:0;z-index:9999;background:rgba(15,42,30,.55);display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+#loader.show{display:flex}
+.loader-box{background:#fff;border-radius:16px;padding:26px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);max-width:78%;text-align:center}
+.loader-ring{width:46px;height:46px;border-radius:50%;border:4px solid #e3efe8;border-top-color:#1a7a4a;animation:ldspin .8s linear infinite}
+@keyframes ldspin{to{transform:rotate(360deg)}}
+.loader-msg{font-size:14px;color:#1a2b22;font-weight:600}
+.loader-sub{font-size:12px;color:#5b6b63;margin-top:-6px}
+</style>
+</head>
+<body>
+
+<div class="offline-banner" id="offlineBanner">📴 Hors ligne — vos saisies sont enregistrées sur le téléphone</div>
+
+<div class="topbar" id="topbar" style="display:none">
+  <div>
+    <h1>Factures SEN-CSU</h1>
+    <div class="sub" id="userInfo"></div>
+  </div>
+  <div class="badge-sync badge-ok" id="syncBadge">✓</div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen active" id="screenLogin">
+  <div class="login-card">
+    <div class="logo"><img src="data:image/png;base64,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" alt="SEN-CSU" style="max-width:100%;height:auto;max-height:80px"></div>
+    <h2>FACTURES SEN-CSU</h2>
+    <p>Connectez-vous avec vos identifiants</p>
+    <label>Email</label>
+    <input type="email" id="loginEmail" placeholder="votre.email@gmail.com" autocomplete="username">
+    <label>Mot de passe</label>
+    <input type="password" id="loginPin" placeholder="••••••••" autocomplete="current-password">
+    <button class="btn" id="btnLogin" onclick="doLogin()">Se connecter</button>
+    <div class="err" id="loginErr"></div>
+    <div class="install-banner" id="installBanner">
+      📲 Installez l'application sur votre téléphone pour l'utiliser hors ligne.
+      <button class="btn small" onclick="installerApp()">Installer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACCUEIL -->
+<div class="screen" id="screenHome">
+  <div class="syncbar done" id="syncbar">
+    <span id="syncMsg">✅ Tout est synchronisé</span>
+    <button class="btn small" onclick="trySync(true)">🔄 Sync</button>
+  </div>
+
+  <!-- Choix du mode -->
+  <div id="icpModeChoice">
+    <p style="font-size:14px;color:var(--text2);margin:8px 0 12px;text-align:center">Que souhaitez-vous faire ?</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div class="card" style="border-top-color:#1a7a4a" onclick="choisirMode('csu')">
+        <div class="ic">🏥</div><div class="t">Bénéficiaire CSU</div>
+        <div style="font-size:11px;color:#667;margin-top:4px">Saisie par régime</div>
+      </div>
+      <div class="card" style="border-top-color:#2471a3" onclick="choisirMode('horscsu')">
+        <div class="ic">🧾</div><div class="t">Patient Hors CSU</div>
+        <div style="font-size:11px;color:#667;margin-top:4px">Facture individuelle</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mode CSU -->
+  <div id="icpModeCSU" style="display:none">
+    <div class="form-head"><button class="back" onclick="retourModeChoice()">←</button>
+      <div class="form-title">🏥 Bénéficiaire CSU</div></div>
+    <div class="grid" id="regimeGrid"></div>
+    <button class="btn secondary" onclick="showPDFScreen()" style="margin-top:14px">📄 Télécharger ma liste (PDF)</button>
+  </div>
+
+  <!-- Mode Hors CSU -->
+  <div id="icpModeHC" style="display:none">
+    <div class="form-head"><button class="back" onclick="retourModeChoice()">←</button>
+      <div class="form-title">🧾 Patient Hors CSU</div></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div class="card" style="border-top-color:#2471a3" onclick="showHCFacture()">
+        <div class="ic">🧾</div><div class="t">Nouvelle facture</div></div>
+      <div class="card" style="border-top-color:#8e44ad" onclick="showHCRef()">
+        <div class="ic">⚙️</div><div class="t">Mes services & prix</div></div>
+      <div class="card" style="border-top-color:#1a7a4a" onclick="showHCSituation()">
+        <div class="ic">📊</div><div class="t">Ma situation</div></div>
+    </div>
+  </div>
+
+  <button class="btn secondary" onclick="showMdpScreen()" style="margin-top:10px">🔑 Changer mon mot de passe</button>
+  <button class="btn secondary" onclick="doLogout()" style="margin-top:8px">Se déconnecter</button>
+</div>
+
+<!-- CHANGER MOT DE PASSE -->
+<div class="screen" id="screenMdp">
+  <div class="form-head"><button class="back" onclick="retourDepuisMdp()">←</button>
+    <div class="form-title">🔑 Changer mon mot de passe</div></div>
+  <div class="form-box">
+    <label class="req">Mot de passe actuel</label>
+    <input type="password" id="mdpAncien" placeholder="Votre mot de passe actuel">
+    <label class="req">Nouveau mot de passe</label>
+    <input type="password" id="mdpNouveau" placeholder="Au moins 4 caractères">
+    <label class="req">Confirmer</label>
+    <input type="password" id="mdpConfirm" placeholder="Retapez le nouveau mot de passe">
+    <button class="btn" onclick="changerMotDePasse()">✅ Modifier</button>
+    <div class="err" id="mdpErr"></div>
+  </div>
+</div>
+
+<!-- HORS CSU : REFERENTIELS -->
+<div class="screen" id="screenHCRef">
+  <div class="form-head"><button class="back" onclick="retourHCAccueil()">←</button>
+    <div class="form-title">⚙️ Mes services & prix</div></div>
+  <div class="form-box">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn secondary small" onclick="telechargerModeleHC()">⬇️ Modèle</button>
+      <button class="btn secondary small" onclick="document.getElementById('hcRefFile').click()">📥 Importer</button>
+      <input type="file" id="hcRefFile" accept=".xlsx,.csv" style="display:none" onchange="importerRefHC()">
+    </div>
+    <label class="req">Service</label>
+    <input list="hcRefDlService" id="hcRefService" placeholder="Ex : Pédiatrie, Dépositaire...">
+    <datalist id="hcRefDlService"></datalist>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:400">
+      <input type="checkbox" id="hcRefDepot" style="width:auto"> Ce service est un <b>dépositaire</b> (médicaments)</label>
+    <label class="req" style="margin-top:10px">Prestation / Médicament</label>
+    <input type="text" id="hcRefPresta" placeholder="Ex : Consultation, ou nom du médicament">
+    <label>Prix (FCFA)</label>
+    <input type="number" id="hcRefPrix" min="0" inputmode="numeric" placeholder="Ex : 1000">
+    <button class="btn" onclick="ajouterRef()">➕ Ajouter</button>
+    <div class="err" id="hcRefErr"></div>
+    <div id="hcRefListe" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- HORS CSU : NOUVELLE FACTURE -->
+<div class="screen" id="screenHCFacture">
+  <div class="form-head"><button class="back" onclick="retourHCAccueil()">←</button>
+    <div class="form-title">🧾 Nouvelle facture</div></div>
+  <div class="form-box">
+    <label class="req">Nom du patient</label>
+    <input type="text" id="hcPatNom" placeholder="Prénom et nom">
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label>Téléphone</label>
+        <input type="tel" id="hcPatTel" placeholder="77 000 00 00"></div>
+      <div style="flex:1"><label>Tél. accompagnant</label>
+        <input type="tel" id="hcPatAcc" placeholder="Optionnel"></div>
+    </div>
+    <div style="border-top:1px solid #eee;margin:16px 0 10px"></div>
+    <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:8px">Ajouter un acte</div>
+    <label class="req">Service</label>
+    <input list="hcDlActeService" id="hcActeService" placeholder="Rechercher un service..." onchange="onServiceChange()" oninput="onServiceChange()">
+    <datalist id="hcDlActeService"></datalist>
+    <label class="req">Prestation</label>
+    <input list="hcDlActePresta" id="hcActePresta" placeholder="Rechercher ou saisir une prestation..." onchange="onPrestaChange()" oninput="onPrestaChange()">
+    <datalist id="hcDlActePresta"></datalist>
+    <div id="hcPuWrap" style="display:none"><label>Prix (FCFA) <span style="color:#999;font-weight:400">— non listée</span></label>
+      <input type="number" id="hcActePu" min="0" inputmode="numeric" placeholder="Saisir le prix"></div>
+    <div id="hcQteWrap" style="display:none"><label>Quantité</label>
+      <input type="number" id="hcActeQte" min="1" value="1" inputmode="numeric"></div>
+    <button class="btn secondary" onclick="ajouterActe()" style="margin-top:10px">➕ Ajouter cet acte</button>
+    <div class="err" id="hcActeErr"></div>
+    <div style="border-top:1px solid #eee;margin:16px 0 8px"></div>
+    <div id="hcLignes"></div>
+    <div id="hcTotal" style="text-align:right;font-size:16px;font-weight:700;color:var(--green);margin-top:8px"></div>
+    <button class="btn" onclick="genererFactureHC()" style="margin-top:12px">🧾 Générer la facture (PDF)</button>
+    <div class="err" id="hcFactErr"></div>
+  </div>
+</div>
+
+<!-- HORS CSU : MA SITUATION -->
+<div class="screen" id="screenHCSituation">
+  <div class="form-head"><button class="back" onclick="retourHCAccueil()">←</button>
+    <div class="form-title">📊 Ma situation</div></div>
+  <div class="form-box">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn small" id="hcPerJour" onclick="chargerSituation('jour')">Aujourd'hui</button>
+      <button class="btn small secondary" id="hcPerMois" onclick="chargerSituation('mois')">Ce mois</button>
+      <button class="btn small secondary" id="hcPerTout" onclick="chargerSituation('tout')">Tout</button>
+    </div>
+    <div class="grid" id="hcSitKPI" style="grid-template-columns:1fr 1fr 1fr;gap:8px"></div>
+    <div style="font-size:13px;font-weight:700;color:var(--green);margin:16px 0 8px">Historique des factures</div>
+    <div id="hcSitListe"></div>
+  </div>
+</div>
+
+<!-- FORMULAIRE -->
+<div class="screen" id="screenForm">
+  <div class="form-head">
+    <button class="back" onclick="showScreen('screenHome')">←</button>
+    <div class="form-title" id="formTitle"></div>
+  </div>
+  <div class="form-box">
+    <div id="formFields"></div>
+    <div id="formActesZone" style="display:none">
+      <div style="border-top:1px solid #eee;margin:16px 0 10px"></div>
+      <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:8px">Prestations du patient</div>
+      <div id="formActeInputs"></div>
+      <div class="err" id="acteCsuErr"></div>
+      <div id="formPanier" style="margin-top:12px"></div>
+      <div id="formPanierTotal" style="text-align:right;font-size:15px;font-weight:700;color:var(--green);margin-top:6px"></div>
+    </div>
+    <button class="btn" onclick="saveEntry(true)" style="margin-top:12px">💾 Valider le patient</button>
+    <div class="err" id="formErr"></div>
+  </div>
+</div>
+
+<!-- TELECHARGEMENT PDF -->
+<div class="screen" id="screenPDF">
+  <div class="form-head">
+    <button class="back" onclick="showScreen('screenHome')">←</button>
+    <div class="form-title">📄 Télécharger ma liste</div>
+  </div>
+  <div class="form-box">
+    <label>Régime</label>
+    <select id="pdfRegime" onchange="loadMois()"></select>
+    <label>Mois</label>
+    <select id="pdfMois"><option value="">— choisir un régime d'abord —</option></select>
+    <button class="btn" id="btnGenPDF" onclick="genererPDF()">📄 Générer le PDF</button>
+    <div class="err" id="pdfErr"></div>
+    <div id="pdfResult" style="margin-top:16px;text-align:center;display:none">
+      <p style="font-size:13px;color:var(--green)">✅ Le téléchargement a démarré</p>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-top:12px">
+      ⚠️ La génération du PDF nécessite une connexion internet.
+    </p>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="loader"><div class="loader-box"><div class="loader-ring"></div>
+  <div class="loader-msg" id="loaderMsg">Chargement...</div>
+  <div class="loader-sub" id="loaderSub"></div></div></div>
+
+<script>
+// ══════════════ CONFIGURATION ══════════════
+// ⚠️ REMPLACER par l'URL de VOTRE Web App Apps Script (celle qui finit par /exec)
+var API_URL = "___URL_WEBAPP_EXEC___";
+
+var APP = { auth:null, user:null, postes:[], regimes:{}, referentiels:{services:[],prestations:[],prix:{},parService:{}}, currentRegime:null };
+var LS_AUTH="sencsu_auth", LS_QUEUE="sencsu_queue", LS_BOOT="sencsu_boot";
+var deferredPrompt = null;
+
+function $(id){ return document.getElementById(id); }
+// ── Navigation & bouton retour du téléphone ──
+// Pile d'états : chaque état est un écran {type:"screen",id} ou un mode ICP {type:"mode",mode}
+var _navStack = [];
+function _pushEtat(etat){
+  var haut = _navStack[_navStack.length-1];
+  // Éviter les doublons consécutifs
+  if (haut && JSON.stringify(haut) === JSON.stringify(etat)) return;
+  _navStack.push(etat);
+  try { history.pushState(etat, ""); } catch(e){}
+}
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
+  if ($(id)) $(id).classList.add("active");
+  window.scrollTo(0,0);
+  _pushEtat({ type:"screen", id:id });
+}
+// Applique un état sans l'empiler (utilisé au retour)
+function _appliquerEtat(etat){
+  if (!etat) return;
+  if (etat.type === "screen") {
+    document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
+    if ($(etat.id)) $(etat.id).classList.add("active");
+    // Si on revient sur l'accueil, remettre le choix de mode par défaut pour un ICP
+    if (etat.id === "screenHome" && APP.user && APP.user.role === "ICP") {
+      $("icpModeChoice").style.display="block";
+      $("icpModeCSU").style.display="none"; $("icpModeHC").style.display="none";
+    }
+    window.scrollTo(0,0);
+  } else if (etat.type === "mode") {
+    // Revenir dans screenHome et afficher le bon mode
+    document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
+    if ($("screenHome")) $("screenHome").classList.add("active");
+    $("icpModeChoice").style.display="none";
+    $("icpModeCSU").style.display = (etat.mode==="csu")?"block":"none";
+    $("icpModeHC").style.display = (etat.mode==="csu")?"none":"block";
+    window.scrollTo(0,0);
+  }
+}
+// Bouton retour : dépiler et appliquer l'état précédent au lieu de quitter l'app
+window.addEventListener("popstate", function(){
+  if (_navStack.length > 1) {
+    _navStack.pop();
+    var precedent = _navStack[_navStack.length-1];
+    _appliquerEtat(precedent);
+    try { history.pushState(precedent, ""); } catch(e){}
+  } else {
+    // Un seul état : ré-empiler pour ne pas quitter
+    try { history.pushState(_navStack[0] || {type:"screen",id:"screenLogin"}, ""); } catch(e){}
+  }
+});
+function toast(m,ms){ var t=$("toast"); t.textContent=m; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(function(){t.style.display="none";}, ms||2600); }
+function showLoader(msg,sub){ $("loaderMsg").textContent=msg||"Traitement..."; $("loaderSub").textContent=sub||""; $("loader").classList.add("show"); }
+function hideLoader(){ $("loader").classList.remove("show"); }
+
+// ══════════════ MODE CSU / HORS CSU ══════════════
+function choisirMode(mode){
+  $("icpModeChoice").style.display="none";
+  $("icpModeCSU").style.display = (mode==="csu")?"block":"none";
+  $("icpModeHC").style.display = (mode==="csu")?"none":"block";
+  // Empiler un état pour que le bouton retour revienne au choix de mode
+  _pushEtat({ type:"mode", mode:mode });
+}
+function retourModeChoice(){
+  $("icpModeChoice").style.display="block";
+  $("icpModeCSU").style.display="none"; $("icpModeHC").style.display="none";
+  _pushEtat({ type:"screen", id:"screenHome" });
+}
+function retourHCAccueil(){
+  document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
+  $("screenHome").classList.add("active");
+  $("icpModeChoice").style.display="none";
+  $("icpModeCSU").style.display="none"; $("icpModeHC").style.display="block";
+  _pushEtat({ type:"mode", mode:"horscsu" });
+}
+function fmtFCFA(n){ n=Math.round(parseFloat(n)||0); return String(n).replace(/\B(?=(\d{3})+(?!\d))/g," ")+" FCFA"; }
+
+// ══════════════ HORS CSU : REFERENTIELS ══════════════
+function showHCRef(){
+  $("hcRefErr").textContent=""; $("hcRefService").value=""; $("hcRefPresta").value="";
+  $("hcRefPrix").value=""; $("hcRefDepot").checked=false;
+  $("hcRefListe").innerHTML='<p style="font-size:12px;color:#667">Chargement...</p>';
+  showScreen("screenHCRef"); chargerRef();
+}
+function chargerRef(){
+  if(!navigator.onLine){ $("hcRefListe").innerHTML='<p style="font-size:12px;color:#e67e22">📴 Connexion requise.</p>'; return; }
+  apiCall({ action:"hc_ref", email:APP.auth.email, pin:APP.auth.pin }).then(function(r){
+    if(r.error){ $("hcRefListe").innerHTML='<p style="color:#c0392b;font-size:12px">'+r.error+'</p>'; return; }
+    APP._hcServices=r.services||[]; renderRefListe(); remplirServiceDatalist();
+  }).catch(function(e){ $("hcRefListe").innerHTML='<p style="color:#c0392b;font-size:12px">Erreur : '+e.message+'</p>'; });
+}
+function remplirServiceDatalist(){
+  var dl=$("hcRefDlService"); if(!dl) return; dl.innerHTML="";
+  (APP._hcServices||[]).forEach(function(s){ var o=document.createElement("option"); o.value=s.nom; dl.appendChild(o); });
+}
+function renderRefListe(){
+  var services=APP._hcServices||[];
+  if(services.length===0){ $("hcRefListe").innerHTML='<p style="font-size:12px;color:#999">Aucun service paramétré.</p>'; return; }
+  var h="";
+  services.forEach(function(s){
+    h+='<div style="margin-top:12px"><div style="font-size:13px;font-weight:700;color:var(--green)">🏥 '+s.nom+
+       (s.depositaire?' <span class="pill" style="background:#eaf2f8;color:#2471a3">Dépositaire</span>':'')+'</div>';
+    (s.prestations||[]).forEach(function(p){
+      h+='<div class="list-card" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-top:4px">'+
+         '<span style="font-size:13px">'+p.nom+' — <b>'+fmtFCFA(p.prix)+'</b></span>'+
+         '<button class="btn small secondary" onclick="supprimerRef('+p.ligne+')">🗑️</button></div>';
+    });
+    h+='</div>';
+  });
+  $("hcRefListe").innerHTML=h;
+}
+function ajouterRef(){
+  var service=$("hcRefService").value.trim(), presta=$("hcRefPresta").value.trim();
+  var prix=$("hcRefPrix").value.trim(), depot=$("hcRefDepot").checked;
+  if(!service){ $("hcRefErr").textContent="Entrez le service."; return; }
+  if(!presta){ $("hcRefErr").textContent="Entrez la prestation."; return; }
+  $("hcRefErr").textContent=""; showLoader("Enregistrement...", service);
+  apiCall({ action:"hc_ajouter_ref", email:APP.auth.email, pin:APP.auth.pin,
+            service:service, prestation:presta, prix:prix, depositaire:depot?"true":"false" }).then(function(r){
+    hideLoader();
+    if(r.error){ $("hcRefErr").textContent=r.error; return; }
+    $("hcRefPresta").value=""; $("hcRefPrix").value=""; toast("✅ "+r.message); chargerRef();
+  }).catch(function(e){ hideLoader(); $("hcRefErr").textContent="Erreur : "+e.message; });
+}
+function supprimerRef(ligne){
+  if(!confirm("Supprimer cette prestation ?")) return;
+  showLoader("Suppression...");
+  apiCall({ action:"hc_supprimer_ref", email:APP.auth.email, pin:APP.auth.pin, ligne:ligne }).then(function(r){
+    hideLoader();
+    if(r.error){ toast("❌ "+r.error); return; }
+    toast("✅ Supprimé"); chargerRef();
+  }).catch(function(e){ hideLoader(); toast("❌ "+e.message); });
+}
+function telechargerModeleHC(){
+  showLoader("Préparation du modèle...");
+  apiCall({ action:"hc_modele", email:APP.auth.email, pin:APP.auth.pin }).then(function(r){
+    hideLoader();
+    if(r.error){ toast("❌ "+r.error); return; }
+    window.open(r.downloadUrl, "_blank"); toast("✅ Modèle téléchargé");
+  }).catch(function(e){ hideLoader(); toast("❌ "+e.message); });
+}
+function importerRefHC(){
+  var f=$("hcRefFile").files[0]; if(!f) return;
+  showLoader("Importation en cours...", "Lecture du fichier");
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var b64=ev.target.result.split(",")[1];
+    // POST (gros payload : le fichier ne tient pas dans une URL JSONP)
+    apiCallPost({ action:"hc_importer", email:APP.auth.email, pin:APP.auth.pin, base64:b64, filename:f.name }).then(function(r){
+      hideLoader(); $("hcRefFile").value="";
+      if(r.error){ toast("❌ "+r.error); return; }
+      toast("✅ "+r.message); chargerRef();
+    }).catch(function(e){ hideLoader(); $("hcRefFile").value=""; toast("❌ "+e.message); });
+  };
+  reader.onerror=function(){ hideLoader(); toast("❌ Lecture impossible"); };
+  reader.readAsDataURL(f);
+}
+
+// ══════════════ HORS CSU : FACTURATION ══════════════
+function showHCFacture(){
+  $("hcPatNom").value=""; $("hcPatTel").value=""; $("hcPatAcc").value=""; $("hcActeQte").value="1";
+  $("hcActeErr").textContent=""; $("hcFactErr").textContent="";
+  APP._hcPanier=[]; renderPanier(); showScreen("screenHCFacture");
+  if(!APP._hcServices){
+    apiCall({ action:"hc_ref", email:APP.auth.email, pin:APP.auth.pin }).then(function(r){
+      if(!r.error) APP._hcServices=r.services||[]; remplirServiceSelect();
+    }).catch(function(){ remplirServiceSelect(); });
+  } else { remplirServiceSelect(); }
+}
+function remplirServiceSelect(){
+  var dl=$("hcDlActeService"); dl.innerHTML="";
+  (APP._hcServices||[]).forEach(function(s){
+    var o=document.createElement("option"); o.value=s.nom; if(s.depositaire)o.label="dépositaire"; dl.appendChild(o);
+  });
+  $("hcActeService").value=""; $("hcActePresta").value="";
+  $("hcDlActePresta").innerHTML=""; $("hcQteWrap").style.display="none";
+}
+function onServiceChange(){
+  var nom=$("hcActeService").value;
+  var service=(APP._hcServices||[]).filter(function(s){return s.nom===nom;})[0];
+  var dl=$("hcDlActePresta"); dl.innerHTML="";
+  $("hcPuWrap").style.display="none"; $("hcActePu").value="";
+  if(!service){ $("hcQteWrap").style.display="none"; return; }
+  service.prestations.forEach(function(p){
+    var o=document.createElement("option"); o.value=p.nom; o.label=fmtFCFA(p.prix); dl.appendChild(o);
+  });
+  $("hcQteWrap").style.display=service.depositaire?"block":"none"; $("hcActeQte").value="1"; $("hcActePresta").value="";
+}
+function onPrestaChange(){
+  var nom=$("hcActeService").value;
+  var service=(APP._hcServices||[]).filter(function(s){return s.nom===nom;})[0];
+  var presta=$("hcActePresta").value.trim();
+  var p=service?service.prestations.filter(function(x){return x.nom===presta;})[0]:null;
+  var prixConnu=p?(parseFloat(p.prix)||0):0;
+  if(presta){ $("hcPuWrap").style.display="block"; $("hcActePu").value=prixConnu>0?prixConnu:""; }
+  else { $("hcPuWrap").style.display="none"; $("hcActePu").value=""; }
+}
+function ajouterActe(){
+  var nomService=$("hcActeService").value.trim();
+  var service=(APP._hcServices||[]).filter(function(s){return s.nom===nomService;})[0];
+  var presta=$("hcActePresta").value.trim();
+  if(!nomService){ $("hcActeErr").textContent="Indiquez le service."; return; }
+  if(!presta){ $("hcActeErr").textContent="Indiquez la prestation."; return; }
+  $("hcActeErr").textContent="";
+  var p=service?service.prestations.filter(function(x){return x.nom===presta;})[0]:null;
+  var pu=parseFloat($("hcActePu").value)||0;
+  if(!pu && !confirm("Aucun prix saisi pour cette prestation (0 FCFA). Continuer ?")) return;
+  var estDepot=service&&service.depositaire, qte=estDepot?(parseFloat($("hcActeQte").value)||1):1;
+  if(!APP._hcPanier) APP._hcPanier=[];
+  APP._hcPanier.push({ service:nomService, type:estDepot?"Médicament":"Prestation", designation:presta, qte:qte, pu:pu });
+  $("hcActePresta").value=""; $("hcActePu").value=""; $("hcPuWrap").style.display="none"; $("hcActeQte").value="1";
+  renderPanier(); toast("✅ Ajouté");
+}
+function retirerLigne(i){ APP._hcPanier.splice(i,1); renderPanier(); }
+function renderPanier(){
+  var panier=APP._hcPanier||[];
+  if(panier.length===0){ $("hcLignes").innerHTML='<p style="font-size:12px;color:#999;text-align:center">Aucun acte ajouté.</p>'; $("hcTotal").textContent=""; return; }
+  var parService={};
+  panier.forEach(function(l,idx){ var s=l.service||"(sans service)"; if(!parService[s]) parService[s]=[]; parService[s].push({l:l,idx:idx}); });
+  var total=0,h="";
+  Object.keys(parService).forEach(function(s){
+    h+='<div style="font-size:12px;font-weight:700;color:#2471a3;margin:8px 0 4px">🏥 '+s+'</div>';
+    parService[s].forEach(function(o){
+      var l=o.l, mt=l.qte*l.pu; total+=mt; var ic=l.type==="Médicament"?"💊":"🩺";
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #eee">'+
+         '<span>'+ic+' '+l.designation+(l.qte>1?' <span style="color:#999">× '+l.qte+'</span>':'')+'</span>'+
+         '<span style="display:flex;align-items:center;gap:6px"><b>'+fmtFCFA(mt)+'</b>'+
+         '<button class="btn small secondary" onclick="retirerLigne('+o.idx+')">✕</button></span></div>';
+    });
+  });
+  $("hcLignes").innerHTML=h; $("hcTotal").textContent="TOTAL : "+fmtFCFA(total);
+}
+function genererFactureHC(){
+  var nom=$("hcPatNom").value.trim(), panier=APP._hcPanier||[];
+  if(!nom){ $("hcFactErr").textContent="Le nom du patient est obligatoire."; return; }
+  if(panier.length===0){ $("hcFactErr").textContent="Ajoutez au moins un acte."; return; }
+  if(!navigator.onLine){ $("hcFactErr").textContent="📴 Connexion requise."; return; }
+  $("hcFactErr").textContent=""; showLoader("Génération de la facture...", "Création du PDF");
+  var payload=JSON.stringify({ patient:{ nom:nom, tel:$("hcPatTel").value.trim(), telAccomp:$("hcPatAcc").value.trim() }, lignes:panier });
+  apiCall({ action:"hc_facturer", email:APP.auth.email, pin:APP.auth.pin, payload:payload }).then(function(r){
+    hideLoader();
+    if(r.error){ $("hcFactErr").textContent=r.error; return; }
+    if(r.base64) telechargerBase64(r.base64, r.filename);
+    toast("✅ "+r.message);
+    APP._hcPanier=[]; $("hcPatNom").value=""; $("hcPatTel").value=""; $("hcPatAcc").value="";
+    remplirServiceSelect(); renderPanier();
+  }).catch(function(e){ hideLoader(); $("hcFactErr").textContent="Erreur : "+e.message; });
+}
+
+// ══════════════ HORS CSU : MA SITUATION ══════════════
+function showHCSituation(){
+  $("hcSitKPI").innerHTML=""; $("hcSitListe").innerHTML='<p style="font-size:12px;color:#667">Chargement...</p>';
+  showScreen("screenHCSituation"); chargerSituation("jour");
+}
+function chargerSituation(periode){
+  ["Jour","Mois","Tout"].forEach(function(p){ var b=$("hcPer"+p); if(b) b.className="btn small secondary"; });
+  var actif=periode==="jour"?"Jour":(periode==="mois"?"Mois":"Tout");
+  if($("hcPer"+actif)) $("hcPer"+actif).className="btn small";
+  if(!navigator.onLine){ $("hcSitListe").innerHTML='<p style="font-size:12px;color:#e67e22">📴 Connexion requise.</p>'; return; }
+  $("hcSitListe").innerHTML='<p style="font-size:12px;color:#667">Chargement...</p>';
+  apiCall({ action:"hc_situation", email:APP.auth.email, pin:APP.auth.pin, periode:periode }).then(function(r){
+    if(r.error){ $("hcSitListe").innerHTML='<p style="color:#c0392b;font-size:12px">'+r.error+'</p>'; return; }
+    renderSituation(r);
+  }).catch(function(e){ $("hcSitListe").innerHTML='<p style="color:#c0392b;font-size:12px">Erreur : '+e.message+'</p>'; });
+}
+function renderSituation(r){
+  var t=r.totaux||{factures:0,patients:0,montant:0};
+  $("hcSitKPI").innerHTML=
+    '<div class="card" style="border-top-color:#2471a3;padding:12px"><div class="t" style="font-size:22px">'+t.factures+'</div><div style="font-size:10px;color:#667">Factures</div></div>'+
+    '<div class="card" style="border-top-color:#1a7a4a;padding:12px"><div class="t" style="font-size:22px">'+t.patients+'</div><div style="font-size:10px;color:#667">Patients</div></div>'+
+    '<div class="card" style="border-top-color:#8e44ad;padding:12px"><div class="t" style="font-size:16px">'+fmtFCFA(t.montant)+'</div><div style="font-size:10px;color:#667">Encaissé</div></div>';
+  var factures=r.factures||[];
+  if(factures.length===0){ $("hcSitListe").innerHTML='<p style="font-size:12px;color:#999;text-align:center;padding:12px">Aucune facture sur cette période.</p>'; return; }
+  var h="";
+  factures.forEach(function(f){
+    h+='<div class="list-card" style="padding:10px 12px"><div style="display:flex;justify-content:space-between;align-items:start">'+
+       '<div><div style="font-weight:700;font-size:13px">'+f.patient+'</div>'+
+       '<div style="font-size:11px;color:#667">'+f.date+' · '+f.nbActes+' acte(s)'+(f.tel?' · '+f.tel:'')+'</div>'+
+       '<div style="font-size:10px;color:#999">'+f.num+'</div></div>'+
+       '<div style="text-align:right"><div style="font-weight:700;color:var(--green);font-size:13px">'+fmtFCFA(f.montant)+'</div>'+
+       '<button class="btn small secondary" style="margin-top:4px" onclick="reimprimer(\''+f.num+'\')">📄 PDF</button></div>'+
+       '</div></div>';
+  });
+  $("hcSitListe").innerHTML=h;
+}
+function reimprimer(num){
+  if(!navigator.onLine){ toast("📴 Connexion requise"); return; }
+  showLoader("Génération du PDF...", num);
+  apiCall({ action:"hc_reimprimer", email:APP.auth.email, pin:APP.auth.pin, numFacture:num }).then(function(r){
+    hideLoader();
+    if(r.error){ toast("❌ "+r.error); return; }
+    if(r.base64){ telechargerBase64(r.base64, r.filename); toast("✅ PDF téléchargé"); }
+  }).catch(function(e){ hideLoader(); toast("❌ "+e.message); });
+}
+function getQueue(){ try{ return JSON.parse(localStorage.getItem(LS_QUEUE)||"[]"); }catch(e){ return []; } }
+function setQueue(q){ localStorage.setItem(LS_QUEUE, JSON.stringify(q)); }
+function uid(){ return Date.now()+"_"+Math.random().toString(36).slice(2,8); }
+
+// ══════════════ APPEL API (vers Apps Script) ══════════════
+// Strategie : POST d'abord (fiable, pas de redirection 404). Si POST echoue
+// (ex : blocage CORS sur certains Safari), on bascule sur JSONP.
+function apiCall(params) {
+  return apiCallPost(params).catch(function(){
+    return apiCallJsonp(params);
+  });
+}
+
+// JSONP : charge la reponse comme un <script>. Fallback si POST bloque (Safari/iPhone).
+function apiCallJsonp(params) {
+  return new Promise(function(resolve, reject){
+    var cbName = "sencsu_cb_" + Date.now() + "_" + Math.floor(Math.random()*100000);
+    var timeout = setTimeout(function(){
+      cleanup();
+      reject(new Error("Délai dépassé (serveur injoignable)"));
+    }, 30000);
+
+    function cleanup(){
+      clearTimeout(timeout);
+      try { delete window[cbName]; } catch(e){ window[cbName] = undefined; }
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(data){
+      cleanup();
+      resolve(data);
+    };
+
+    var url = API_URL + "?callback=" + encodeURIComponent(cbName);
+    Object.keys(params).forEach(function(k){
+      url += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+    });
+
+    var script = document.createElement("script");
+    script.src = url;
+    script.onerror = function(){
+      cleanup();
+      reject(new Error("Échec de chargement (réseau ou URL incorrecte)"));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+// Appel POST : fiable pour tous les payloads (petits et gros fichiers Excel base64).
+// text/plain evite le preflight CORS ; Apps Script lit e.postData.contents.
+function apiCallPost(params) {
+  return fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(params),
+    redirect: "follow"
+  }).then(function(r){
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  });
+}
+
+function updateSyncUI(){
+  var q=getQueue(), badge=$("syncBadge"), bar=$("syncbar"), msg=$("syncMsg");
+  if(q.length>0){ badge.textContent="⏳ "+q.length; badge.className="badge-sync"; bar.className="syncbar pending"; msg.textContent="⏳ "+q.length+" dossier(s) en attente"; }
+  else { badge.textContent="✓"; badge.className="badge-sync badge-ok"; bar.className="syncbar done"; msg.textContent="✅ Tout est synchronisé"; }
+}
+
+// ══════════════ CONNEXION ══════════════
+function doLogin(){
+  var email=$("loginEmail").value.trim(), pin=$("loginPin").value.trim();
+  if(!email){ $("loginErr").textContent="Entrez votre email."; return; }
+  $("btnLogin").disabled=true; $("loginErr").textContent="Connexion...";
+
+  apiCall({ action:"bootstrap", email:email, pin:pin })
+    .then(function(res){
+      $("btnLogin").disabled=false;
+      if(res.error){ $("loginErr").textContent=res.error; return; }
+      APP.auth={email:email, pin:pin};
+      localStorage.setItem(LS_AUTH, JSON.stringify(APP.auth));
+      localStorage.setItem(LS_BOOT, JSON.stringify(res));
+      applyBootstrap(res);
+    })
+    .catch(function(err){
+      $("btnLogin").disabled=false;
+      // Tenter la reconnexion avec le cache si dispo
+      var boot=null; try{ boot=JSON.parse(localStorage.getItem(LS_BOOT)||"null"); }catch(e){}
+      var savedAuth=null; try{ savedAuth=JSON.parse(localStorage.getItem(LS_AUTH)||"null"); }catch(e){}
+      if(boot && savedAuth && savedAuth.email.toLowerCase()===email.toLowerCase() && savedAuth.pin===pin){
+        APP.auth=savedAuth; applyBootstrap(boot);
+        toast("📴 Connecté hors ligne (données en cache)");
+      } else {
+        // Afficher la VRAIE erreur pour diagnostic
+        var msg = (err && err.message) ? err.message : String(err);
+        $("loginErr").textContent = "Erreur : " + msg;
+      }
+    });
+}
+
+function applyBootstrap(res){
+  APP.user=res.user; APP.postes=res.postes||[]; APP.regimes=res.regimes;
+  APP.referentiels=res.referentiels||{services:[],prestations:[],prix:{}};
+  $("topbar").style.display="flex";
+  $("userInfo").textContent=APP.user.email+" — "+APP.user.role+(APP.user.poste?" ("+APP.user.poste+")":"");
+  buildHomeGrid(); updateSyncUI(); showScreen("screenHome"); retourModeChoice(); trySync(false);
+}
+
+function showMdpScreen(){
+  $("mdpAncien").value=""; $("mdpNouveau").value=""; $("mdpConfirm").value=""; $("mdpErr").textContent="";
+  showScreen("screenMdp");
+}
+function retourDepuisMdp(){ showScreen("screenHome"); retourModeChoice(); }
+function changerMotDePasse(){
+  var ancien=$("mdpAncien").value, nouveau=$("mdpNouveau").value, conf=$("mdpConfirm").value;
+  if(!ancien){ $("mdpErr").textContent="Saisissez votre mot de passe actuel."; return; }
+  if(!nouveau||nouveau.length<4){ $("mdpErr").textContent="Au moins 4 caractères."; return; }
+  if(nouveau!==conf){ $("mdpErr").textContent="La confirmation ne correspond pas."; return; }
+  if(!navigator.onLine){ $("mdpErr").textContent="📴 Connexion requise."; return; }
+  $("mdpErr").textContent=""; showLoader("Modification...");
+  apiCall({ action:"changer_mdp", email:APP.auth.email, pin:APP.auth.pin, ancien:ancien, nouveau:nouveau }).then(function(r){
+    hideLoader();
+    if(r.error){ $("mdpErr").textContent=r.error; return; }
+    APP.auth.pin=nouveau;
+    try{ localStorage.setItem(LS_AUTH, JSON.stringify(APP.auth)); }catch(e){}
+    toast("✅ "+r.message); retourDepuisMdp();
+  }).catch(function(e){ hideLoader(); $("mdpErr").textContent="Erreur : "+e.message; });
+}
+
+function doLogout(){
+  var q=getQueue();
+  if(q.length>0 && !confirm(q.length+" dossier(s) non synchronisé(s). Se déconnecter quand même ?")) return;
+  localStorage.removeItem(LS_AUTH); APP.auth=null; APP.user=null;
+  $("topbar").style.display="none"; showScreen("screenLogin");
+}
+
+// ══════════════ ACCUEIL ══════════════
+function buildHomeGrid(){
+  var grid=$("regimeGrid"); grid.innerHTML="";
+  var ordreICP=["ENFANTS_5ANS","CLASSIQUE","SESAME","NDONGO_DARA","BSF","CEC"];
+  var exclus={CESARIENNES:1,DIALYSE_PERITONEALE:1,HEMODIALYSE:1};
+  var cles=ordreICP.filter(function(k){ return APP.regimes[k]; });
+  Object.keys(APP.regimes).forEach(function(k){ if(exclus[k]) return; if(cles.indexOf(k)<0) cles.push(k); });
+  cles.forEach(function(key){
+    var r=APP.regimes[key]; if(!r) return;
+    var card=document.createElement("div");
+    card.className="card"; card.style.borderTopColor=r.couleur||"#1a7a4a";
+    card.innerHTML='<div class="ic">'+(r.icone||"📋")+'</div><div class="t">'+r.titre+'</div>';
+    card.onclick=function(){ openForm(key); };
+    grid.appendChild(card);
+  });
+}
+
+// ══════════════ FORMULAIRE (identique a l'app Apps Script) ══════════════
+function calculerAge(dateStr, dateRef){
+  var n=new Date(dateStr); if(isNaN(n)) return null;
+  var a=dateRef?new Date(dateRef):new Date();
+  if(isNaN(a)) a=new Date();
+  var age=a.getFullYear()-n.getFullYear(), m=a.getMonth()-n.getMonth();
+  if(m<0||(m===0&&a.getDate()<n.getDate())) age--;
+  return age;
+}
+
+function openForm(regimeKey, keepAdmin){
+  APP.currentRegime=regimeKey; var regime=APP.regimes[regimeKey];
+  $("formTitle").textContent=(regime.icone||"")+" "+regime.titre; $("formErr").textContent="";
+  var box=$("formFields"), oldValues={};
+  if(keepAdmin){ box.querySelectorAll("[data-field]").forEach(function(el){ oldValues[el.getAttribute("data-field")]=el.value; }); }
+  box.innerHTML="";
+  if(APP.user.role!=="ICP" && APP.postes.length>0){
+    var lbl=document.createElement("label"); lbl.textContent="Poste de santé"; lbl.className="req";
+    var sel=document.createElement("select"); sel.id="fieldPoste";
+    APP.postes.forEach(function(p){ var o=document.createElement("option"); o.value=p; o.textContent=p; sel.appendChild(o); });
+    box.appendChild(lbl); box.appendChild(sel);
+  }
+  var today=new Date().toISOString().slice(0,10);
+  function estChampActe(f){ return f.list==="services"||f.list==="prestations"||f.qte||f.pu||f.montant; }
+  var regimeAActes=regime.fields.some(estChampActe);
+  APP._csuActeFields=regime.fields.filter(estChampActe);
+  APP._csuPanier=[];
+  var acteBox=$("formActeInputs"); acteBox.innerHTML="";
+
+  regime.fields.forEach(function(f){
+    if(estChampActe(f)) return;
+    var lbl=document.createElement("label"); lbl.textContent=f.label||f.name; if(f.req) lbl.className="req"; box.appendChild(lbl);
+    var el=_creerChampCSU(f);
+    if(keepAdmin && oldValues[f.name]!==undefined && !/diagnostic|date de prise/i.test(f.name)){ el.value=oldValues[f.name]; }
+    box.appendChild(el);
+  });
+
+  if(regimeAActes){
+    var fService=APP._csuActeFields.filter(function(f){return f.list==="services";})[0];
+    var fAutres=APP._csuActeFields.filter(function(f){return f.list!=="services";});
+    if(fService){
+      var lblS=document.createElement("label"); lblS.textContent=fService.name; if(fService.req) lblS.className="req";
+      acteBox.appendChild(lblS); acteBox.appendChild(_creerChampCSU(fService));
+    }
+    var ligne=document.createElement("div");
+    ligne.style.cssText="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:4px";
+    fAutres.forEach(function(f){
+      var col=document.createElement("div");
+      col.style.cssText=(f.list==="prestations")?"flex:1 1 100%;min-width:150px":"flex:1 1 80px;min-width:70px";
+      var lbl=document.createElement("label"); lbl.textContent=f.label||f.name; if(f.req) lbl.className="req"; lbl.style.cssText="font-size:12px";
+      col.appendChild(lbl); col.appendChild(_creerChampCSU(f)); ligne.appendChild(col);
+    });
+    acteBox.appendChild(ligne);
+    // Bouton "Ajouter la prestation" en pleine largeur sous les champs
+    var btnAdd=document.createElement("button"); btnAdd.className="btn secondary"; btnAdd.type="button";
+    btnAdd.textContent="➕ Ajouter la prestation"; btnAdd.style.cssText="margin-top:8px";
+    btnAdd.onclick=ajouterActeCSU; acteBox.appendChild(btnAdd);
+  }
+
+  $("formActesZone").style.display=regimeAActes?"block":"none";
+  $("acteCsuErr").textContent=""; renderPanierCSU();
+  showScreen("screenForm");
+}
+
+function _blocAgeEstime(dateEl){
+  var wrap=document.createElement("div");
+  wrap.style.cssText="margin:6px 0 10px";
+  // Case à cocher
+  var chkLine=document.createElement("label");
+  chkLine.style.cssText="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;font-weight:400;cursor:pointer";
+  var chk=document.createElement("input"); chk.type="checkbox"; chk.style.cssText="width:auto;margin:0";
+  chkLine.appendChild(chk);
+  chkLine.appendChild(document.createTextNode("Je n'ai pas la date de naissance, saisir l'âge (en mois)"));
+  wrap.appendChild(chkLine);
+  // Zone âge (mois uniquement)
+  var zone=document.createElement("div");
+  zone.style.cssText="display:none;margin-top:8px";
+  zone.innerHTML=
+    '<label style="font-size:12px">Âge (en mois)</label>'+
+    '<input type="number" id="ageMois" min="0" max="59" inputmode="numeric" placeholder="ex. 27">';
+  wrap.appendChild(zone);
+  var info=document.createElement("div");
+  info.style.cssText="font-size:12px;color:var(--green);margin-top:6px;display:none";
+  wrap.appendChild(info);
+
+  function recalc(){
+    var champ=$("ageMois");
+    var vide=!champ || !champ.value;
+    var mois=parseInt(champ?champ.value:"",10);
+    if(vide){ info.style.display="none"; dateEl.value=""; return; }
+    if(isNaN(mois)||mois<0){ info.style.display="none"; dateEl.value=""; return; }
+    if(mois>=60){ info.style.color="#c0392b"; info.textContent="⛔ 60 mois (5 ans) ou plus : régime réservé aux moins de 5 ans."; info.style.display="block"; dateEl.value=""; return; }
+    // Estimer : aujourd'hui moins N mois, puis 1er jour du mois
+    var now=new Date();
+    var d=new Date(now.getFullYear(), now.getMonth()-mois, 1);
+    var mm=("0"+(d.getMonth()+1)).slice(-2), aaaa=d.getFullYear();
+    dateEl.value=aaaa+"-"+mm+"-01";   // format input date
+    info.style.color="var(--green)";
+    info.textContent="Date de naissance estimée : 01/"+mm+"/"+aaaa;
+    info.style.display="block";
+  }
+
+  chk.addEventListener("change",function(){
+    if(chk.checked){
+      zone.style.display="block";
+      dateEl.readOnly=true; dateEl.style.background="#f2f4f7";
+    } else {
+      zone.style.display="none"; info.style.display="none";
+      dateEl.readOnly=false; dateEl.style.background="";
+      dateEl.value="";
+    }
+  });
+  zone.addEventListener("input",recalc);
+  return wrap;
+}
+
+function _creerChampCSU(f){
+  var box=$("formFields"), today=new Date().toISOString().slice(0,10);
+  var el;
+  var useSelectRef=(f.list==="services" && APP.referentiels.services && APP.referentiels.services.length>0);
+  if(f.type==="select"){
+    el=document.createElement("select");
+    var empty=document.createElement("option"); empty.value=""; empty.textContent="— choisir —"; el.appendChild(empty);
+    (f.options||[]).forEach(function(o){ var opt=document.createElement("option"); opt.value=o; opt.textContent=o; el.appendChild(opt); });
+    if(/forfait/i.test(f.name)){
+      el.addEventListener("change",function(){
+        var m=String(el.value).match(/(\d[\d\s]*)\s*$/);
+        if(m){ var montant=parseInt(m[1].replace(/\s/g,""),10);
+          var mtEl=$("formActeInputs").querySelector('[data-field="Montant Total"]')||$("formActeInputs").querySelector('[data-montant]');
+          if(mtEl&&!isNaN(montant)) mtEl.value=montant; }
+      });
+    }
+  } else {
+    el=document.createElement("input");
+    el.type=(f.type==="datetime")?"datetime-local":(f.type==="number")?"number":(f.type==="date")?"date":(f.type==="tel")?"tel":"text";
+    if(f.type==="date"&&f.today) el.value=today;
+    if(f.type==="number"){ el.min="0"; el.inputMode="numeric"; }
+    if(useSelectRef && f.list==="services"){
+      el.setAttribute("placeholder","Rechercher un service...");
+      var dlS="dl_services";
+      if(!document.getElementById(dlS)){
+        var dls=document.createElement("datalist"); dls.id=dlS;
+        APP.referentiels.services.forEach(function(v){ var o=document.createElement("option"); o.value=v; dls.appendChild(o); });
+        document.body.appendChild(dls);
+      }
+      el.setAttribute("list",dlS);
+      el.addEventListener("change",function(){ majPrestationsSelon(el.value); });
+      el.addEventListener("input",function(){ majPrestationsSelon(el.value); });
+    }
+    else if(f.list && APP.referentiels[f.list] && APP.referentiels[f.list].length){
+      if(f.list==="prestations") el.setAttribute("placeholder","Rechercher une prestation...");
+      var dlId="dl_"+f.list;
+      if(!document.getElementById(dlId)){
+        var dl=document.createElement("datalist"); dl.id=dlId;
+        APP.referentiels[f.list].forEach(function(v){ var o=document.createElement("option"); o.value=v; dl.appendChild(o); });
+        document.body.appendChild(dl);
+      }
+      el.setAttribute("list",dlId);
+      if(f.list==="prestations"){
+        el.addEventListener("change",function(){
+          var prix=APP.referentiels.prix[el.value];
+          if(prix!==undefined){ var pu=$("formActeInputs").querySelector("[data-pu]"); if(pu){ pu.value=prix; computeMontant(); } }
+        });
+      }
+    }
+  }
+  el.setAttribute("data-field",f.name);
+  if(f.list==="prestations") el.setAttribute("data-prestation","1");
+  if(f.qte){ el.setAttribute("data-qte","1"); el.addEventListener("input",computeMontant); }
+  if(f.pu){ el.setAttribute("data-pu","1"); el.addEventListener("input",computeMontant); }
+  if(f.montant){ el.setAttribute("data-montant","1"); }
+  if(f.defaut!==undefined && f.defaut!=="") el.value=f.defaut;
+  return el;
+}
+
+// Collecte l'acte saisi dans les champs. Renvoie {acte, manq, vide}
+function _collecterActeCSU(){
+  var acteBox=$("formActeInputs"), acte={}, manq=[], rempli=false;
+  (APP._csuActeFields||[]).forEach(function(f){
+    var el=acteBox?acteBox.querySelector('[data-field="'+f.name.replace(/"/g,'\\"')+'"]'):null;
+    var val=el?el.value.trim():""; acte[f.name]=val;
+    if(f.req&&!val) manq.push(f.name);
+    // "rempli" si une prestation (ou un montant / qté / P.U.) est saisie ; un service seul ne suffit pas
+    if(val && (f.list==="prestations" || f.montant || f.qte || f.pu)) rempli=true;
+  });
+  return { acte:acte, manq:manq, vide:!rempli };
+}
+function ajouterActeCSU(){
+  var r=_collecterActeCSU();
+  if(r.vide){ $("acteCsuErr").textContent="Choisissez une prestation."; return; }
+  if(r.manq.length){ $("acteCsuErr").textContent="Champs manquants : "+r.manq.join(", "); return; }
+  $("acteCsuErr").textContent="";
+  if(!APP._csuPanier) APP._csuPanier=[];
+  APP._csuPanier.push(r.acte);
+  var acteBox=$("formActeInputs");
+  (APP._csuActeFields||[]).forEach(function(f){
+    if(f.list==="services") return;   // garder le service sélectionné
+    var el=acteBox.querySelector('[data-field="'+f.name.replace(/"/g,'\\"')+'"]'); if(el) el.value="";
+  });
+  renderPanierCSU(); toast("✅ Prestation ajoutée");
+}
+function retirerActeCSU(i){ APP._csuPanier.splice(i,1); renderPanierCSU(); }
+function renderPanierCSU(){
+  var panier=APP._csuPanier||[], box=$("formPanier"); if(!box) return;
+  if(panier.length===0){ box.innerHTML='<p style="font-size:12px;color:#999;text-align:center;line-height:1.5">Pour <b>une seule prestation</b> : choisissez-la et cliquez « Valider le patient ».<br>Pour <b>plusieurs</b> : cliquez « Ajouter la prestation » à chaque fois.</p>'; $("formPanierTotal").textContent=""; return; }
+  var fService=(APP._csuActeFields||[]).filter(function(f){return f.list==="services";})[0];
+  var fPresta=(APP._csuActeFields||[]).filter(function(f){return f.list==="prestations";})[0];
+  var fMontant=(APP._csuActeFields||[]).filter(function(f){return f.montant;})[0];
+  var fQte=(APP._csuActeFields||[]).filter(function(f){return f.qte;})[0];
+  var total=0,h="";
+  panier.forEach(function(a,i){
+    var service=fService?a[fService.name]:"", presta=fPresta?a[fPresta.name]:"";
+    var mt=fMontant?(parseFloat(a[fMontant.name])||0):0, qte=fQte?a[fQte.name]:"";
+    total+=mt;
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px solid #eee">'+
+       '<div><div style="font-weight:600">'+(presta||"—")+'</div>'+
+       '<div style="color:#888">'+(service?'🩺 '+service:'')+(qte?' · ×'+qte:'')+'</div></div>'+
+       '<div style="display:flex;align-items:center;gap:6px">'+(mt?'<b>'+fmtFCFA(mt)+'</b>':'')+
+       '<button class="btn small secondary" onclick="retirerActeCSU('+i+')">✕</button></div></div>';
+  });
+  box.innerHTML=h;
+  var taux=_tauxCSUClient(APP.currentRegime);
+  var mtCSU=Math.round(total*taux), mtPatient=Math.round(total*(1-taux));
+  var tot=$("formPanierTotal");
+  if(total>0){
+    tot.innerHTML="TOTAL : "+fmtFCFA(total)+
+      '<div style="font-size:12px;font-weight:400;color:#555;margin-top:4px">'+
+      '🏥 Facturé à la CSU : <b style="color:var(--green)">'+fmtFCFA(mtCSU)+'</b>'+
+      (mtPatient>0?' · 👤 Part patient : <b style="color:#c0392b">'+fmtFCFA(mtPatient)+'</b>':'')+'</div>';
+  } else { tot.textContent=""; }
+}
+function _tauxCSUClient(regime){ if(regime==="NDONGO_DARA"||regime==="CLASSIQUE") return 0.8; return 1.0; }
+
+function majPrestationsSelon(service){
+  var parService=(APP.referentiels&&APP.referentiels.parService)||{};
+  var liste=parService[service]||[];
+  var champ=document.querySelector('#formActeInputs [data-prestation]')||document.querySelector('#formFields [data-prestation]');
+  if(!champ) return;
+  var dlId="dl_prestations_filtre";
+  var dl=document.getElementById(dlId);
+  if(!dl){ dl=document.createElement("datalist"); dl.id=dlId; document.body.appendChild(dl); }
+  dl.innerHTML="";
+  var source=liste.length?liste:(APP.referentiels.prestations||[]);
+  source.forEach(function(v){ var o=document.createElement("option"); o.value=v; dl.appendChild(o); });
+  champ.setAttribute("list",dlId);
+  if(champ._dernierService!==service){ champ.value=""; champ._dernierService=service; }
+}
+
+function computeMontant(){
+  var box=$("formActeInputs"), qte=box.querySelector("[data-qte]"), pu=box.querySelector("[data-pu]"), mt=box.querySelector("[data-montant]");
+  if(qte&&pu&&mt){ var q=parseFloat(qte.value), p=parseFloat(pu.value); if(!isNaN(q)&&!isNaN(p)) mt.value=q*p; }
+}
+
+function saveEntry(closeAfter){
+  var regime=APP.regimes[APP.currentRegime], box=$("formFields"), missing=[], dateNaissance=null;
+  function estChampActe(f){ return f.list==="services"||f.list==="prestations"||f.qte||f.pu||f.montant; }
+  var regimeAActes=regime.fields.some(estChampActe);
+
+  var patient={}, datePrise=null;
+  regime.fields.forEach(function(f){
+    if(estChampActe(f)) return;
+    var el=box.querySelector('[data-field="'+f.name.replace(/"/g,'\\"')+'"]');
+    var val=el?el.value.trim():"";
+    if(f.name==="Date de naissance" && val) dateNaissance=val;
+    if(/date de prise en charge/i.test(f.name) && val) datePrise=val;
+    if((f.type==="date"||f.type==="datetime") && val){
+      var d=new Date(val);
+      if(!isNaN(d)){ var dd=("0"+d.getDate()).slice(-2), mm=("0"+(d.getMonth()+1)).slice(-2);
+        val=dd+"/"+mm+"/"+d.getFullYear();
+        if(f.type==="datetime") val+=" "+("0"+d.getHours()).slice(-2)+"h"+("0"+d.getMinutes()).slice(-2);
+      }
+    }
+    patient[f.name]=val; if(f.req && !val) missing.push(f.name);
+  });
+  if(missing.length){ $("formErr").textContent="Champs obligatoires manquants : "+missing.join(", "); return; }
+  if(dateNaissance){
+    // Âge calculé à la DATE DE PRISE EN CHARGE (l'âge au moment des soins), sinon aujourd'hui
+    var age=calculerAge(dateNaissance, datePrise);
+    if(APP.currentRegime==="ENFANTS_5ANS" && age>=5){ $("formErr").textContent="⛔ Cet enfant avait "+age+" ans à la date de prise en charge (régime réservé aux moins de 5 ans)."; return; }
+    if(APP.currentRegime==="SESAME" && age<60){ $("formErr").textContent="⛔ Ce patient a "+age+" ans (Plan Sésame réservé aux 60 ans et plus)."; return; }
+  }
+
+  var actes;
+  if(regimeAActes){
+    actes=(APP._csuPanier||[]).slice();
+    // Prendre en compte une prestation saisie mais non ajoutée au panier (panier vide OU non)
+    var rActe=_collecterActeCSU();
+    if(!rActe.vide){
+      if(rActe.manq.length){ $("formErr").textContent="Prestation incomplète : "+rActe.manq.join(", "); return; }
+      actes.push(rActe.acte);
+    }
+    if(actes.length===0){ $("formErr").textContent="Choisissez au moins une prestation."; return; }
+    actes=actes.map(function(a){
+      var copie={};
+      (APP._csuActeFields||[]).forEach(function(f){
+        var val=a[f.name]||"";
+        if((f.type==="date"||f.type==="datetime") && val){
+          var da=new Date(val);
+          if(!isNaN(da)){ var dd2=("0"+da.getDate()).slice(-2), mm2=("0"+(da.getMonth()+1)).slice(-2); val=dd2+"/"+mm2+"/"+da.getFullYear(); }
+        }
+        copie[f.name]=val;
+      });
+      return copie;
+    });
+  } else { actes=[{}]; }
+
+  var posteSel=$("fieldPoste"), poste=posteSel?posteSel.value:APP.user.poste;
+  var q=getQueue();
+  actes.forEach(function(acte){
+    var data={};
+    Object.keys(patient).forEach(function(k){ data[k]=patient[k]; });
+    Object.keys(acte).forEach(function(k){ data[k]=acte[k]; });
+    q.push({id:uid(), regime:APP.currentRegime, poste:poste, data:data});
+  });
+  setQueue(q); updateSyncUI(); $("formErr").textContent="";
+  toast("💾 "+actes.length+" prestation(s) enregistrée(s) ("+q.length+" en attente)");
+  trySync(false);
+  if(closeAfter) showScreen("screenHome"); else openForm(APP.currentRegime, true);
+}
+
+// ══════════════ SYNCHRONISATION ══════════════
+var syncing=false;
+function trySync(manual){
+  if(syncing) return;
+  var q=getQueue();
+  if(q.length===0){ if(manual) toast("✅ Rien à synchroniser"); return; }
+  if(!navigator.onLine){ if(manual) toast("📴 Pas de réseau — réessayez plus tard"); return; }
+  if(!APP.auth) return;
+  syncing=true; if(manual) toast("🔄 Synchronisation...");
+  // Envoyer par petits lots (JSONP passe par l'URL, limitee en longueur)
+  syncLot(q.slice(), 0, manual);
+}
+
+function syncLot(tous, dejaSauves, manual){
+  var restants=getQueue();
+  if(restants.length===0){
+    syncing=false; updateSyncUI();
+    if(dejaSauves>0) toast("✅ "+dejaSauves+" dossier(s) synchronisé(s)");
+    else if(manual) toast("✅ Terminé");
+    return;
+  }
+  var LOT=5;  // 5 dossiers par appel (evite URL trop longue)
+  var lot=restants.slice(0, LOT);
+  apiCall({ action:"submit", email:APP.auth.email, pin:APP.auth.pin, entries:JSON.stringify(lot) })
+    .then(function(res){
+      if(res.error){ syncing=false; if(manual) toast("❌ "+res.error); return; }
+      var savedIds=res.saved||[];
+      var remaining=getQueue().filter(function(e){ return savedIds.indexOf(e.id)<0; });
+      setQueue(remaining); updateSyncUI();
+      if(savedIds.length>0){
+        // Continuer avec le lot suivant
+        syncLot(tous, dejaSauves + savedIds.length, manual);
+      } else {
+        syncing=false;
+        if(manual) toast("⚠️ Rien n'a pu être synchronisé");
+      }
+    })
+    .catch(function(){ syncing=false; if(manual) toast("❌ Erreur réseau — données conservées",3500); });
+}
+
+window.addEventListener("online", function(){ $("offlineBanner").style.display="none"; trySync(false); });
+window.addEventListener("offline", function(){ $("offlineBanner").style.display="block"; });
+
+// ══════════════ TELECHARGEMENT PDF ══════════════
+function showPDFScreen(){
+  var sel=$("pdfRegime");
+  sel.innerHTML='<option value="">— choisir —</option>';
+  var exclusICP={CESARIENNES:1,DIALYSE_PERITONEALE:1,HEMODIALYSE:1};
+  var ordreICP=["ENFANTS_5ANS","CLASSIQUE","SESAME","NDONGO_DARA","BSF","CEC"];
+  var cles=ordreICP.filter(function(k){ return APP.regimes[k]; });
+  Object.keys(APP.regimes).forEach(function(k){ if(exclusICP[k]) return; if(cles.indexOf(k)<0) cles.push(k); });
+  cles.forEach(function(k){
+    var o=document.createElement("option"); o.value=k; o.textContent=APP.regimes[k].titre; sel.appendChild(o);
+  });
+  $("pdfMois").innerHTML='<option value="">— choisir un régime d\'abord —</option>';
+  $("pdfResult").style.display="none"; $("pdfErr").textContent="";
+  showScreen("screenPDF");
+}
+
+function loadMois(){
+  var regime=$("pdfRegime").value, selMois=$("pdfMois");
+  $("pdfResult").style.display="none"; $("pdfErr").textContent="";
+  if(!regime){ selMois.innerHTML='<option value="">— choisir un régime d\'abord —</option>'; return; }
+  if(!navigator.onLine){ $("pdfErr").textContent="📴 La génération PDF nécessite une connexion internet."; return; }
+  selMois.innerHTML='<option value="">Chargement...</option>';
+  apiCall({ action:"mois", email:APP.auth.email, pin:APP.auth.pin, regime:regime })
+    .then(function(res){
+      if(res.error){ $("pdfErr").textContent=res.error; return; }
+      if(!res.mois || res.mois.length===0){ selMois.innerHTML='<option value="">Aucune donnée</option>'; return; }
+      selMois.innerHTML='<option value="">— choisir le mois —</option>';
+      res.mois.forEach(function(m){ var o=document.createElement("option"); o.value=m.key; o.textContent=m.label; selMois.appendChild(o); });
+    })
+    .catch(function(e){ $("pdfErr").textContent="Erreur : "+(e&&e.message?e.message:e); });
+}
+
+function genererPDF(){
+  var regime=$("pdfRegime").value, mois=$("pdfMois").value;
+  if(!regime){ $("pdfErr").textContent="Choisissez un régime."; return; }
+  if(!mois){ $("pdfErr").textContent="Choisissez un mois."; return; }
+  if(!navigator.onLine){ $("pdfErr").textContent="📴 Connexion internet requise pour générer le PDF."; return; }
+  $("pdfErr").textContent=""; $("pdfResult").style.display="none";
+  $("btnGenPDF").disabled=true; $("btnGenPDF").textContent="⏳ Génération en cours...";
+
+  apiCall({ action:"pdf", email:APP.auth.email, pin:APP.auth.pin, regime:regime, moisKey:mois, format:"pdf" })
+    .then(function(res){
+      $("btnGenPDF").disabled=false; $("btnGenPDF").textContent="📄 Générer le PDF";
+      if(res.error){ $("pdfErr").textContent=res.error; return; }
+      var filesB64=(res.files||[]).filter(function(f){ return f.base64; });
+      if(filesB64.length>1){
+        APP._pdfFiles=filesB64;
+        var html='<p style="font-size:13px;color:var(--green);margin-bottom:10px">✅ '+
+          filesB64.length+' fichiers générés. Touchez pour télécharger :</p>';
+        filesB64.forEach(function(f,i){
+          var libelle=/PAGE_DE_GARDE/i.test(f.filename)?"📄 Page de garde (portrait)"
+                     :/LISTE/i.test(f.filename)?"📋 Liste nominative (paysage)":"📎 "+f.filename;
+          html+='<button class="btn" style="margin-bottom:8px" onclick="telechargerPdfIndex('+i+')">'+libelle+'</button>';
+        });
+        $("pdfResult").style.display="block"; $("pdfResult").innerHTML=html;
+        toast("✅ "+filesB64.length+" fichiers prêts");
+      } else if(res.base64){
+        telechargerBase64(res.base64, res.filename||"liste.pdf");
+        $("pdfResult").style.display="block";
+        toast("✅ PDF téléchargé !");
+      } else { $("pdfErr").textContent="Réponse inattendue du serveur."; }
+    })
+    .catch(function(e){
+      $("btnGenPDF").disabled=false; $("btnGenPDF").textContent="📄 Générer le PDF";
+      $("pdfErr").textContent="Erreur : "+(e&&e.message?e.message:e);
+    });
+}
+
+function telechargerPdfIndex(i){
+  var f=(APP._pdfFiles||[])[i];
+  if(f) telechargerBase64(f.base64, f.filename);
+}
+
+function telechargerBase64(base64, filename){
+  var binary=atob(base64), bytes=new Uint8Array(binary.length);
+  for(var i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  var blob=new Blob([bytes], {type:"application/pdf"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+}
+
+// ══════════════ INSTALLATION PWA ══════════════
+window.addEventListener("beforeinstallprompt", function(e){
+  e.preventDefault(); deferredPrompt=e;
+  $("installBanner").style.display="block";
+});
+function installerApp(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function(){ deferredPrompt=null; $("installBanner").style.display="none"; });
+}
+
+// ══════════════ DEMARRAGE ══════════════
+(function init(){
+  if(!navigator.onLine) $("offlineBanner").style.display="block";
+  // Initialiser l'historique pour intercepter le bouton retour du téléphone
+  try { history.replaceState({ type:"screen", id:"screenLogin" }, ""); history.pushState({ type:"screen", id:"screenLogin" }, ""); } catch(e){}
+  _navStack = [{ type:"screen", id:"screenLogin" }];
+  // Enregistrer le service worker (le coeur de l'offline)
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("./sw.js").catch(function(e){ console.log("SW erreur:", e); });
+  }
+  // Reconnexion auto avec le cache
+  try {
+    var saved=JSON.parse(localStorage.getItem(LS_AUTH)||"null");
+    var boot=JSON.parse(localStorage.getItem(LS_BOOT)||"null");
+    if(saved && boot && !boot.error){
+      APP.auth=saved; applyBootstrap(boot);
+      if(navigator.onLine){
+        apiCall({ action:"bootstrap", email:saved.email, pin:saved.pin })
+          .then(function(res){ if(!res.error){ localStorage.setItem(LS_BOOT, JSON.stringify(res)); APP.postes=res.postes; APP.regimes=res.regimes; APP.referentiels=res.referentiels; } })
+          .catch(function(){});
+      }
+    }
+  } catch(e){}
+})();
+</script>
+</body>
+</html>
