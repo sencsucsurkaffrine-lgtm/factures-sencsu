@@ -301,7 +301,7 @@
 <script>
 // ══════════════ CONFIGURATION ══════════════
 // ⚠️ REMPLACER par l'URL de VOTRE Web App Apps Script (celle qui finit par /exec)
-var API_URL = "https://script.google.com/macros/s/AKfycby9Qp2wjmkwVYvzS7ETUW9cPXHiWXENRdTQcBukQdhoKcQkUj2KX0EX53w_XgDmZpkX/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbwejgTz-_0tEtG2gfGyO0x8duuzhS4Wx6XYw-OhFxaRuo95NfmzmZANQcX_H3KBHkfc/exec";
 
 var APP = { auth:null, user:null, postes:[], regimes:{}, referentiels:{services:[],prestations:[],prix:{},parService:{}}, currentRegime:null };
 var LS_AUTH="sencsu_auth", LS_QUEUE="sencsu_queue", LS_BOOT="sencsu_boot";
@@ -905,10 +905,13 @@ function _creerChampCSU(f){
     else if(f.list && APP.referentiels[f.list] && APP.referentiels[f.list].length){
       if(f.list==="prestations") el.setAttribute("placeholder","Rechercher une prestation...");
       var dlId="dl_"+f.list;
-      if(!document.getElementById(dlId)){
-        var dl=document.createElement("datalist"); dl.id=dlId;
+      var dl=document.getElementById(dlId);
+      if(!dl){ dl=document.createElement("datalist"); dl.id=dlId; document.body.appendChild(dl); }
+      // Pour les prestations, on repart de la liste COMPLÈTE à chaque rendu du formulaire
+      // (évite de garder un filtre d'un autre régime). Le filtre par service la réduit ensuite.
+      if(f.list==="prestations" || !dl.childNodes.length){
+        dl.innerHTML="";
         APP.referentiels[f.list].forEach(function(v){ var o=document.createElement("option"); o.value=v; dl.appendChild(o); });
-        document.body.appendChild(dl);
       }
       el.setAttribute("list",dlId);
       if(f.list==="prestations"){
@@ -991,13 +994,15 @@ function majPrestationsSelon(service){
   var liste=parService[service]||[];
   var champ=document.querySelector('#formActeInputs [data-prestation]')||document.querySelector('#formFields [data-prestation]');
   if(!champ) return;
-  var dlId="dl_prestations_filtre";
+  // On remplit la MÊME datalist déjà référencée par le champ (plus fiable sur mobile
+  // que de basculer l'attribut "list" vers une autre datalist, ce qui n'actualise pas
+  // toujours les suggestions sous Chrome Android).
+  var dlId=champ.getAttribute("list")||"dl_prestations";
   var dl=document.getElementById(dlId);
-  if(!dl){ dl=document.createElement("datalist"); dl.id=dlId; document.body.appendChild(dl); }
-  dl.innerHTML="";
+  if(!dl){ dl=document.createElement("datalist"); dl.id=dlId; document.body.appendChild(dl); champ.setAttribute("list",dlId); }
   var source=liste.length?liste:(APP.referentiels.prestations||[]);
+  dl.innerHTML="";
   source.forEach(function(v){ var o=document.createElement("option"); o.value=v; dl.appendChild(o); });
-  champ.setAttribute("list",dlId);
   if(champ._dernierService!==service){ champ.value=""; champ._dernierService=service; }
 }
 
@@ -1166,7 +1171,7 @@ function genererPDF(){
         var html='<p style="font-size:13px;color:var(--green);margin-bottom:10px">✅ '+
           filesB64.length+' fichiers générés. Touchez pour télécharger :</p>';
         filesB64.forEach(function(f,i){
-          var libelle=/PAGE_DE_GARDE/i.test(f.filename)?"📄 Page de garde (portrait)"
+          var libelle=/PAGE_DE_GARDE/i.test(f.filename)?"📄 Facture (portrait)"
                      :/LISTE/i.test(f.filename)?"📋 Liste nominative (paysage)":"📎 "+f.filename;
           html+='<button class="btn" style="margin-bottom:8px" onclick="telechargerPdfIndex('+i+')">'+libelle+'</button>';
         });
