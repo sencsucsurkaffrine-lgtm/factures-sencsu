@@ -2698,9 +2698,9 @@ var qrcode = function() {
 <script>
 // ══════════════ CONFIGURATION ══════════════
 // ⚠️ REMPLACER par l'URL de VOTRE Web App Apps Script (celle qui finit par /exec)
-var API_URL = "https://script.google.com/macros/s/AKfycbwejgTz-_0tEtG2gfGyO0x8duuzhS4Wx6XYw-OhFxaRuo95NfmzmZANQcX_H3KBHkfc/exec";
+var API_URL = "___URL_WEBAPP_EXEC___";
 
-var APP_VERSION = "v116";   // repère de version visible (en-tête) pour confirmer le déploiement
+var APP_VERSION = "v113";   // repère de version visible (en-tête) pour confirmer le déploiement
 var APP = { auth:null, user:null, postes:[], regimes:{}, referentiels:{services:[],prestations:[],prix:{},parService:{}}, currentRegime:null };
 var LS_AUTH="sencsu_auth", LS_QUEUE="sencsu_queue", LS_BOOT="sencsu_boot";
 var deferredPrompt = null;
@@ -3295,13 +3295,8 @@ function openForm(regimeKey, keepAdmin, edition, sansAssistant){
     if(regimeKey==="SESAME"){ APP._cni_recto=""; APP._cni_verso=""; }
     else { APP._verifStatut=""; APP._verifMotif=""; APP._benef=null; }
     _wizMonter(regimeKey);
-    // Hors ligne :
-    //  - régimes à vérification (classiques) : on BLOQUE, pas de saisie manuelle (attendre le réseau) ;
-    //  - autres (Sésame/Enfants) : saisie directe des infos bénéficiaire.
-    if(!navigator.onLine){
-      if(REGIMES_VERIF[regimeKey]){ APP._verifStatut=""; }
-      else { APP._verifStatut="manuel"; _wizEtape("infos"); }
-    }
+    // Hors ligne : ni vérification ni scan possibles -> saisie directe des infos bénéficiaire
+    if(!navigator.onLine){ APP._verifStatut="manuel"; _wizEtape("infos"); }
   }
   // Bouton brouillon : masqué en mode Modifier
   var bb=$("btnBrouillon"); if(bb) bb.style.display=edition?"none":"";
@@ -3402,10 +3397,8 @@ function _blocVerifCSU(regimeKey){
   btn.addEventListener("click", function(){ _verifierCSU(regimeKey, inp, btn, msg, resultat, btnManuel); });
   inp.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); btn.click(); } });
   ligne.appendChild(inp); ligne.appendChild(btn);
-  // Régimes à vérification : la saisie manuelle n'est JAMAIS proposée (pas de contournement).
-  // On n'ajoute pas le bouton « Saisir les infos » ; btnManuel reste masqué.
-  wrap.appendChild(ligne); wrap.appendChild(msg); wrap.appendChild(resultat);
-  if(!navigator.onLine){ btn.disabled=true; msg.style.color="#c0392b"; msg.textContent="📴 Hors ligne : la vérification est indisponible. La facturation n'est possible qu'une fois le réseau revenu."; }
+  wrap.appendChild(ligne); wrap.appendChild(msg); wrap.appendChild(resultat); wrap.appendChild(btnManuel);
+  if(!navigator.onLine){ btn.disabled=true; msg.textContent="📴 Vérification indisponible hors ligne."; btnManuel.style.display="block"; }
   return wrap;
 }
 
@@ -3452,25 +3445,20 @@ function _verifierCSU(regimeKey, inp, btn, msg, resultat, btnManuel){
   var code=(inp.value||"").trim().toUpperCase();
   resultat.innerHTML=""; btnManuel.style.display="none";
   if(!code){ msg.style.color="#c0392b"; msg.textContent="Entrez le code d'immatriculation."; return; }
-  if(!navigator.onLine){ msg.style.color="#c0392b"; msg.textContent="📴 Pas de réseau : vérification impossible. La facturation reste bloquée tant que le réseau n'est pas revenu."; APP._verifStatut=""; return; }
+  if(!navigator.onLine){ msg.style.color="#c0392b"; msg.textContent="📴 Pas de réseau."; btnManuel.style.display="block"; return; }
   btn.disabled=true; msg.style.color="#555"; msg.textContent="🔎 Vérification en cours…"; APP._verifStatut="";
   apiCall({ action:"verif_csu", email:APP.auth.email, pin:APP.auth.pin, regime:regimeKey, code:code })
     .then(function(res){
       btn.disabled=false;
       if(res.error){ msg.style.color="#c0392b"; msg.textContent="❌ "+res.error; return; }
       if(res.indisponible){
-        // Service de vérification indisponible : on ATTEND, pas de saisie manuelle.
-        APP._verifStatut="";
-        msg.style.color="#c0392b"; msg.textContent="⚠️ "+(res.erreur||"Service de vérification indisponible.")+" Réessayez plus tard — la facturation n'est pas autorisée sans vérification.";
-        return;
+        msg.style.color="#b9770e"; msg.textContent="⚠️ "+(res.erreur||"Service de vérification indisponible.");
+        btnManuel.style.display="block"; return;
       }
       if(!res.trouve){
-        // Code absent du référentiel CSU = bénéficiaire NON ÉLIGIBLE : on BLOQUE la
-        // facturation et on n'autorise PAS la saisie manuelle (qui contournerait le contrôle).
-        APP._verifStatut="invalide"; APP._verifMotif=res.motif||"Bénéficiaire introuvable (non éligible) pour ce code.";
-        msg.style.color="#c0392b";
-        msg.textContent="⛔ "+(res.motif||"Aucun bénéficiaire éligible pour ce code.")+" Facturation non autorisée.";
-        btnManuel.style.display="none"; return;
+        APP._verifStatut=""; APP._verifMotif="";
+        msg.style.color="#b9770e"; msg.textContent="⚠️ "+(res.motif||"Aucun bénéficiaire pour ce code.")+" Vous pouvez saisir les informations manuellement.";
+        btnManuel.style.display="block"; return;
       }
       msg.textContent="";
       var d=res.data||{}; APP._benef=d;
@@ -3486,8 +3474,8 @@ function _verifierCSU(regimeKey, inp, btn, msg, resultat, btnManuel){
         APP._verifStatut="invalide"; APP._verifMotif=res.motif||"Carte non valide.";
       }
     })
-    .catch(function(){ btn.disabled=false; msg.style.color="#c0392b"; APP._verifStatut="";
-      msg.textContent="⚠️ Service injoignable. Réessayez — la facturation n'est pas autorisée sans vérification."; });
+    .catch(function(){ btn.disabled=false; msg.style.color="#b9770e";
+      msg.textContent="⚠️ Service injoignable."; btnManuel.style.display="block"; });
 }
 
 // ══════════════ SCAN CNI (Plan Sésame) : caméra guidée recto+verso -> OCR MRZ -> remplissage ══════════════
@@ -3920,9 +3908,8 @@ function computeMontant(){
 function saveEntry(closeAfter){
   // Blocage facturation : régimes à vérification de couverture (sauf en mode Modifier)
   if(!APP._editMode && REGIMES_VERIF[APP.currentRegime]){
-    if(APP._verifStatut==="invalide"){ $("formErr").textContent="⛔ Facturation bloquée : "+(APP._verifMotif||"bénéficiaire non éligible."); return; }
-    // Seul le statut « valide » autorise la facturation : pas de saisie manuelle pour ces régimes.
-    if(APP._verifStatut!=="valide"){ $("formErr").textContent="⛔ Facturation bloquée : vérifiez d'abord le code (un bénéficiaire éligible est requis)."; return; }
+    if(APP._verifStatut==="invalide"){ $("formErr").textContent="⛔ Facturation bloquée : "+(APP._verifMotif||"carte non valide."); return; }
+    if(APP._verifStatut!=="valide" && APP._verifStatut!=="manuel"){ $("formErr").textContent="Vérifiez d'abord le code d'immatriculation (ou choisissez « Saisir les infos »)."; return; }
   }
   var regime=APP.regimes[APP.currentRegime], box=$("formFields"), missing=[], dateNaissance=null;
   function estChampActe(f){ return f.list==="services"||f.list==="prestations"||f.qte||f.pu||f.montant; }
@@ -5723,13 +5710,13 @@ function _ctbVerifier(){
   if(!code){ msg.style.color="#c0392b"; msg.textContent="Entrez le code d'immatriculation."; return; }
   var dateRef=($("ctbDate")&&$("ctbDate").value)||APP._ctb.date||"";   // valider la carte À la date de prise en charge
   if(!dateRef){ msg.style.color="#c0392b"; msg.textContent="Indiquez d'abord la date de prise en charge."; return; }
-  if(!navigator.onLine){ _ctbPasVerifie(msg, "Pas de réseau — vérification impossible."); return; }
+  if(!navigator.onLine){ msg.style.color="#b9770e"; msg.textContent="📴 Pas de réseau — saisie manuelle possible."; _ctbManuel(); return; }
   var btn=$("ctbVerif"); btn.disabled=true; msg.style.color="#555"; msg.textContent="🔎 Vérification en cours…";
   apiCall({ action:"verif_csu", email:APP.auth.email, pin:APP.auth.pin, regime:APP._ctb.regime, code:code, date:dateRef })
     .then(function(res){ btn.disabled=false;
       if(res.error){ msg.style.color="#c0392b"; msg.textContent="❌ "+res.error; return; }
-      if(res.indisponible){ _ctbPasVerifie(msg, (res.erreur||"Service de vérification indisponible.")); return; }
-      if(!res.trouve){ _ctbPasVerifie(msg, (res.motif||"Aucun bénéficiaire éligible pour ce code.")); return; }
+      if(res.indisponible){ msg.style.color="#b9770e"; msg.textContent="⚠️ "+(res.erreur||"Service indisponible."); _ctbManuel(); return; }
+      if(!res.trouve){ msg.style.color="#b9770e"; msg.textContent="⚠️ "+(res.motif||"Aucun bénéficiaire pour ce code."); _ctbManuel(); return; }
       if(!res.valide){ msg.style.color="#c0392b"; msg.textContent="⛔ "+(res.motif||"Carte non valide — facturation bloquée."); return; }
       // Vérifier que le code appartient bien au régime choisi
       var attendu=_grpRegime(APP._ctb.regime);
@@ -5749,22 +5736,10 @@ function _ctbVerifier(){
       APP._ctb.benef=res.data||{}; APP._ctb.verifStatut="valide";
       _ctbRenderPatient(); _ctbRevele();
     })
-    .catch(function(){ btn.disabled=false; _ctbPasVerifie(msg, "Service injoignable."); });
-}
-
-// Échec/indisponibilité de vérification : pour les régimes à VÉRIFICATION on BLOQUE
-// (pas de saisie manuelle), pour les autres (Sésame/Enfants) la saisie manuelle reste possible.
-function _ctbPasVerifie(msg, texte){
-  APP._ctb.verifStatut="";
-  if(REGIMES_VERIF[APP._ctb.regime]){
-    msg.style.color="#c0392b"; msg.textContent="⛔ "+texte+" Facturation non autorisée sans vérification.";
-  } else {
-    msg.style.color="#b9770e"; msg.textContent="⚠️ "+texte; _ctbManuel();
-  }
+    .catch(function(){ btn.disabled=false; msg.style.color="#b9770e"; msg.textContent="⚠️ Service injoignable."; _ctbManuel(); });
 }
 
 function _ctbManuel(){
-  if(REGIMES_VERIF[APP._ctb.regime]) return;   // régimes à vérification : jamais de saisie manuelle
   var man=$("ctbManuelWrap"); if(!man || man._open) return; man._open=true;
   man.innerHTML='<div style="border-top:1px dashed #ddd;margin-top:10px;padding-top:10px">'+
     '<div style="font-size:12px;color:#777;margin-bottom:6px">Ou saisir les informations manuellement :</div>'+
@@ -5929,12 +5904,6 @@ function _ctbEnvoyerDossier(ctx){
 
 function _ctbValider(){
   var err=$("ctbErr"); if(err){ err.style.color="#c0392b"; err.textContent=""; }
-  // Régimes à vérification : la facturation n'est permise qu'avec une vérification RÉUSSIE
-  // (statut « valide »). Pas de saisie manuelle, pas de contournement — sauf en mode Modifier.
-  if(!APP._editFacture && REGIMES_VERIF[APP._ctb.regime] && APP._ctb.verifStatut!=="valide"){
-    if(err) err.textContent="⛔ Facturation bloquée : contrôlez d'abord l'éligibilité (un bénéficiaire éligible est requis).";
-    return;
-  }
   var date=$("ctbDate").value; if(!date){ if(err) err.textContent="Indiquez la date de prise en charge."; return; }
   var regime=APP._ctb.regime, dFR=_ctbDateFR(date), AF=_ctbActeFields();
   var patient={}, actes;
