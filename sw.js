@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 
 // Changer la version a chaque mise a jour pour forcer le rafraichissement du cache
-const CACHE_VERSION = "sencsu-v35";
+const CACHE_VERSION = "sencsu-v116";
 
 // Fichiers a mettre en cache pour un fonctionnement 100% hors ligne
 const FICHIERS_CACHE = [
@@ -37,36 +37,53 @@ self.addEventListener("activate", (event) => {
 });
 
 // ── INTERCEPTION DES REQUETES ──
-// Strategie : "cache d'abord" pour les fichiers de l'app (marche offline),
-// "reseau d'abord" pour les appels a l'API Apps Script (donnees fraiches).
+// Strategie :
+//   • API Apps Script : toujours le reseau (donnees fraiches).
+//   • Page (index.html / navigation) : RESEAU D'ABORD, cache en secours hors ligne.
+//     -> on ne sert plus jamais un ancien index.html fige : la derniere version en
+//        ligne est toujours chargee des qu'il y a du reseau.
+//   • Autres fichiers statiques (icones, manifest) : cache d'abord (rapide, offline).
 self.addEventListener("fetch", (event) => {
-  const url = event.request.url;
+  const req = event.request;
+  const url = req.url;
 
-  // Les appels vers Apps Script (script.google.com) : toujours par le reseau.
-  // S'ils echouent (hors ligne), l'app gere la mise en file d'attente locale.
+  // Appels vers Apps Script : laisser passer au reseau (file d'attente locale si hors ligne).
   if (url.indexOf("script.google.com") !== -1 ||
       url.indexOf("googleusercontent.com") !== -1) {
-    return; // laisser passer au reseau normalement
+    return;
+  }
+  if (req.method !== "GET") return;
+
+  // Page principale / navigations : RESEAU D'ABORD.
+  const estPage = req.mode === "navigate" ||
+                  url.endsWith("/") ||
+                  url.indexOf("index.html") !== -1;
+  if (estPage) {
+    event.respondWith(
+      fetch(req).then((rep) => {
+        if (rep && rep.status === 200) {
+          const clone = rep.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
+        }
+        return rep;
+      }).catch(() =>
+        caches.match(req).then((r) => r || caches.match("./index.html"))
+      )
+    );
+    return;
   }
 
-  // Fichiers de l'app : cache d'abord, reseau en secours
+  // Autres fichiers de l'app : cache d'abord, reseau en secours.
   event.respondWith(
-    caches.match(event.request).then((reponseCache) => {
+    caches.match(req).then((reponseCache) => {
       if (reponseCache) return reponseCache;
-      return fetch(event.request).then((reponseReseau) => {
-        // Mettre en cache les nouvelles ressources de l'app
-        if (reponseReseau && reponseReseau.status === 200 &&
-            event.request.method === "GET") {
+      return fetch(req).then((reponseReseau) => {
+        if (reponseReseau && reponseReseau.status === 200) {
           const clone = reponseReseau.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
         }
         return reponseReseau;
-      }).catch(() => {
-        // Hors ligne et pas en cache : renvoyer la page principale si c'est une navigation
-        if (event.request.mode === "navigate") {
-          return caches.match("./index.html");
-        }
-      });
+      }).catch(() => undefined);
     })
   );
 });
